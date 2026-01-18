@@ -6,8 +6,19 @@ const collectionRouter = require("./routes/collectionRoutes");
 
 const app = express();
 
-/* ================= MIDDLEWARE ================= */
-app.use(cors());
+/* ================= GLOBAL MIDDLEWARE ================= */
+app.use(
+  cors({
+    origin: [
+      "https://sindhuja-colloction.vercel.app", // Production frontend
+      "http://localhost:5173"                  // Local development
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+  })
+);
+
 app.use(express.json());
 
 /* ================= HEALTH CHECK ================= */
@@ -19,6 +30,7 @@ app.get("/", (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+
     if (!email || !password) {
       return res.status(400).json({ message: "Missing email or password" });
     }
@@ -37,15 +49,15 @@ app.post("/api/login", async (req, res) => {
       return res.status(403).json({ message: "Account blocked" });
     }
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
       return res.status(401).json({ message: "Wrong password" });
     }
 
     res.json({
       id: user.id,
       name: user.name,
-      isAdmin: user.isAdmin,
+      isAdmin: user.isAdmin
     });
   } catch (err) {
     console.error("LOGIN ERROR 👉", err);
@@ -70,7 +82,7 @@ app.get("/api/centers", async (req, res) => {
   }
 });
 
-/* ================= MEMBERS (BASIC) ================= */
+/* ================= MEMBERS ================= */
 app.get("/api/members/:centerId", async (req, res) => {
   try {
     const { centerId } = req.params;
@@ -88,23 +100,20 @@ app.get("/api/members/:centerId", async (req, res) => {
       .eq("center_id", centerId);
 
     if (error) throw error;
+
     const result = data
       .filter(
         m =>
           m.loans &&
-          m.loans.length > 0 &&
           m.loans.some(l => l.status === "CREDITED")
       )
       .map(m => {
-        const creditedLoan = m.loans.find(
-          l => l.status === "CREDITED"
-        );
-
+        const loan = m.loans.find(l => l.status === "CREDITED");
         return {
           member_id: m.id,
           name: m.name,
-          loan_id: creditedLoan.id,
-          status: creditedLoan.status
+          loan_id: loan.id,
+          status: loan.status
         };
       });
 
@@ -115,15 +124,11 @@ app.get("/api/members/:centerId", async (req, res) => {
   }
 });
 
-
-
-
-
 /* ================= COLLECTION ROUTES ================= */
 app.use("/api/collections", collectionRouter);
 
 /* ================= SERVER START ================= */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
